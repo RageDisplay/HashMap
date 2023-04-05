@@ -1,55 +1,68 @@
 class hash_map:
-    def __init__(self, size=10, load_factor=0.75):
+    def __init__(self, size=10, max_load_factor=0.75):
         self.size = size
-        self.load_factor = load_factor
-        self.count = 0
-        self.table = [[] for _ in range(size)]
-    
+        self.max_load_factor = max_load_factor
+        self.num_items = 0
+        self.num_buckets = 0
+        self.buckets = [[] for i in range(self.size)]
+        
     def clear(self):
-        self.table = [[] for _ in range(self.size)]
-        self.count = 0
-    
+        self.num_items = 0
+        self.num_buckets = 0
+        self.buckets = [[] for i in range(self.size)]
+        
     def __setitem__(self, key, value):
-        index = hash(key) % self.size
-        for i, (k, v) in enumerate(self.table[index]):
-            if k == key:
-                self.table[index][i] = (key, value)
+        bucket_index = hash(key) % self.size
+        bucket = self.buckets[bucket_index]
+        for i in range(len(bucket)):
+            if bucket[i][0] == key:
+                bucket[i] = (key, value)
                 return
-        self.table[index].append((key, value))
-        self.count += 1
-        if self.count > self.size * self.load_factor:
-            self._resize(2 * self.size + 1)
-    
+        bucket.append((key, value))
+        self.num_items += 1
+        if len(bucket) == 1:
+            self.num_buckets += 1
+        load_factor = float(self.num_items) / float(self.size)
+        if load_factor > self.max_load_factor:
+            self.__rehash(2 * self.size + 1)
+            
     def __getitem__(self, key):
-        index = hash(key) % self.size
-        for k, v in self.table[index]:
-            if k == key:
-                return v
+        bucket_index = hash(key) % self.size
+        bucket = self.buckets[bucket_index]
+        for i in range(len(bucket)):
+            if bucket[i][0] == key:
+                return bucket[i][1]
         raise KeyError(key)
-    
+        
     def __delitem__(self, key):
-        index = hash(key) % self.size
-        for i, (k, v) in enumerate(self.table[index]):
-            if k == key:
-                del self.table[index][i]
-                self.count -= 1
+        bucket_index = hash(key) % self.size
+        bucket = self.buckets[bucket_index]
+        for i in range(len(bucket)):
+            if bucket[i][0] == key:
+                del bucket[i]
+                self.num_items -= 1
+                if len(bucket) == 0:
+                    self.num_buckets -= 1
                 return
         raise KeyError(key)
-    
+        
     def __len__(self):
-        return self.count
-    
-    def load_factor(self):
-        return self.count / self.size
-    
-    def current_load(self):
-        return sum(len(lst) for lst in self.table) / len(self.table)
-    
-    def _resize(self, new_size):
-        new_table = [[] for _ in range(new_size)]
-        for lst in self.table:
-            for k, v in lst:
-                index = hash(k) % new_size
-                new_table[index].append((k, v))
+        return self.num_items
+        
+    def __get_load_factor(self):
+        return float(self.num_items) / float(self.size)
+        
+    def __get_bucket_load_factor(self):
+        return float(self.num_items) / float(self.num_buckets) if self.num_buckets > 0 else 0.0
+        
+    def __rehash(self, new_size):
+        new_buckets = [[] for i in range(new_size)]
+        for bucket in self.buckets:
+            for key, value in bucket:
+                new_bucket_index = hash(key) % new_size
+                new_buckets[new_bucket_index].append((key, value))
         self.size = new_size
-        self.table = new_table
+        self.buckets = new_buckets
+        
+    load_factor = property(__get_load_factor)
+    bucket_load_factor = property(__get_bucket_load_factor)
